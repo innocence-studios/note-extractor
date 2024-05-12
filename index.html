@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Note viewer</title>
+  <style>
+    * {
+      font-family: Consolas;
+      text-align: center;
+    }
+    table {
+      border-collapse: collapse;
+      border: 2px solid rgb(140 140 140);
+      font-family: sans-serif;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+    }
+    td, th {
+      border: 1px solid rgb(160 160 160);
+      min-width: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <input type="file" id="fileInput" accept=".audio">
+  <div id="viewer">
+    <table>
+      <caption>
+        Note viewer
+      </caption>
+      <tbody id="table-body" hidden>
+        <tr id="B">
+          <th scope="row">B</th>
+        </tr>
+        <tr id="A♯">
+          <th scope="row">A♯</th>
+        </tr>
+        <tr id="A">
+          <th scope="row">A</th>
+        </tr>
+        <tr id="G♯">
+          <th scope="row">G♯</th>
+        </tr>
+        <tr id="G">
+          <th scope="row">G</th>
+        </tr>
+        <tr id="F♯">
+          <th scope="row">F♯</th>
+        </tr>
+        <tr id="F">
+          <th scope="row">F</th>
+        </tr>
+        <tr id="E">
+          <th scope="row">E</th>
+        </tr>
+        <tr id="D♯">
+          <th scope="row">D♯</th>
+        </tr>
+        <tr id="D">
+          <th scope="row">D</th>
+        </tr>
+        <tr id="C♯">
+          <th scope="row">C♯</th>
+        </tr>
+        <tr id="C">
+          <th scope="row">C</th>
+        </tr>
+      </tbody>
+      <button hidden id="play-button">
+        Play
+      </button>
+    </table>
+  </div>
+
+  <script>
+    const context = new AudioContext();
+    context.resume();
+
+    const fileInput = document.getElementById('fileInput');
+
+    const NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+    fileInput.addEventListener('change', event => {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+
+      const baseOctave = 2;
+      
+      let notes = [];
+      let time = 0;
+      reader.onload = (event => {
+        const text = event.target.result;
+        time = parseFloat(text.split('\n')[0]);
+        console.log(time);
+        let column = 0;
+        for (let line of text.trim().split('\n').slice(1).join('').split(',')){
+          let row = 0;
+          let freq = parseFloat(line.split(' ')[0]);
+          if (!freq) continue;
+
+          let semitones = Math.round(12 * Math.log2(freq / 440)) % 12;
+          let note_ = NOTES[semitones % 12] || 'X';
+          let octave = Math.floor(semitones / 12) + baseOctave
+
+          for (let note of NOTES){
+            let n = document.createElement('td');
+            n.textContent = ' ';
+            if (note == note_) {
+              n.textContent = octave;
+              n.style.backgroundColor = '#000000';
+              notes.push(`${note} ${octave} ${freq}`);
+            };
+            if ((note_ == 'X' && note == 'C')) notes.push(`${note_} ${octave} ${freq}`);
+            n.id = `${column}-${row}`;
+            document.getElementById(note).appendChild(n);
+            row++;
+          };
+          column++;
+        };
+        document.getElementById('table-body').hidden = false;
+        console.log(notes);
+        document.getElementById('play-button').addEventListener('click', async () => {
+          let i = 0;
+          for (let n of notes){
+            if (!n.startsWith('X')){
+              let [note, octave, frequency] = n.split(' ');
+              
+              console.log(`Playing note ${note} (${freq}Hz)`);
+              playNote(context, freq, time);
+              document.getElementById(`${i}-${NOTES.indexOf(note)}`).style.backgroundColor = '#FF0000';
+              await new Promise(s => setTimeout(s, time));
+              document.getElementById(`${i}-${NOTES.indexOf(note)}`).style.backgroundColor = '#000000';
+            }
+            else await new Promise(s => setTimeout(s, time));
+            i++;
+          };
+        });
+        document.getElementById('play-button').hidden = false;
+      });
+
+      reader.readAsText(file);
+    });
+
+    /**
+     * @function
+     * @param {AudioContext} context
+     * @param {Number} frequency
+     * @param {Number} duration
+     * @return {void}
+    */
+    function playNote(context, frequency, duration = .5) {
+      const oscillator = context.createOscillator();
+      gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.connect(gain);
+      oscillator.frequency.value = frequency;
+      gain.connect(context.destination);
+      oscillator.start(0);
+      gain.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + duration);
+    };
+  </script>
+</body>
+</html>
